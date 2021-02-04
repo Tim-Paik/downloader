@@ -34,8 +34,10 @@ void Download::start(const QUrl &url, QFile *file,
     request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
     this->reply = this->manager.get(request);
 
-    connect(this->reply,SIGNAL(finished()),this,SLOT(finishedPart()));
-    connect(this->reply,SIGNAL(readyRead()),this,SLOT(readReady()));
+    //connect(this->reply,SIGNAL(finished()),this,SLOT(finishedPart()));
+    //connect(this->reply,SIGNAL(readyRead()),this,SLOT(readReady()));
+    connect(this->reply,&QNetworkReply::finished,this,&Download::finishedPart);
+    connect(this->reply,&QNetworkReply::readyRead,this,&Download::readReady);
 }
 
 void Download::finishedPart() {
@@ -72,7 +74,8 @@ qulonglong Downloader::getFileSize(QUrl url) {
     QNetworkRequest request(url);
     request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
     QNetworkReply *reply = manager.head(request);
-    connect(reply, SIGNAL(finished()), &loop, SLOT(quit()), Qt::DirectConnection);
+    //connect(reply, SIGNAL(finished()), &loop, SLOT(quit()), Qt::DirectConnection);
+    connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit, Qt::DirectConnection);
     loop.exec();
     //获取文件大小
     QVariant var = reply->header(QNetworkRequest::ContentLengthHeader);
@@ -97,8 +100,10 @@ void Downloader::start(const QString &url) {
         qulonglong start = fileSize * i / this->numberThreads;
         qulonglong end = fileSize * (i+1) / this->numberThreads;
         temp = new Download();
-        connect(temp,SIGNAL(downloadComplete()),this,SLOT(subPartComplete()));
-        connect(temp,SIGNAL(downloadComplete()),temp,SLOT(deleteLater()));
+        //connect(temp,SIGNAL(downloadComplete()),this,SLOT(subPartComplete()));
+        //connect(temp,SIGNAL(downloadComplete()),temp,SLOT(deleteLater()));
+        connect(temp,&Download::downloadComplete,this,&Downloader::subPartComplete);
+        connect(temp,&Download::downloadComplete,temp,&Download::deleteLater);
         temp->start(this->url,this->file,start,end);
         qDebug()<<start<<end;
     }

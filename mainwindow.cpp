@@ -8,13 +8,14 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     Downloader down;
-    connect(&down,SIGNAL(downloadComplete()),this,SLOT(ok()));
+    //connect(&down,SIGNAL(downloadComplete()),this,SLOT(ok()));
+    connect(&down,&Downloader::downloadComplete,this,&MainWindow::ok);
     qDebug()<<"connect ok";
     qDebug()<<"QSslSocket="<<QSslSocket::sslLibraryBuildVersionString();
     qDebug() << "OpenSSL支持情况:" << QSslSocket::supportsSsl();
     QDateTime time = QDateTime::currentDateTime();
     qDebug()<<time.toString("yyyy-MM-dd hh:mm:ss ddd");
-    down.start("https://home.timpaik.top:8008/100MiB.file");
+    down.start("https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/x86_64/archlinuxcn.files");
 }
 
 MainWindow::~MainWindow()
