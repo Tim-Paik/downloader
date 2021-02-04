@@ -2,6 +2,7 @@
 #define DOWNLOADER_H
 
 #include <QObject>
+#include <QDir>
 #include <QUrl>
 #include <QFile>
 #include <QFileInfo>
@@ -13,7 +14,7 @@ class Download : public QObject
 {
     Q_OBJECT
 public:
-    Download(QObject *parent = nullptr);
+    Download(qulonglong index, QObject *parent = nullptr);
     void start(const QUrl &url, QFile *file,
                qulonglong startPoint=0, qulonglong endPoint=-1);
 
@@ -23,6 +24,7 @@ public slots:
 
 signals:
     void downloadComplete();
+    void downloadUpdate(qulonglong);
 
 private:
     QNetworkAccessManager manager;
@@ -31,6 +33,7 @@ private:
     qulonglong bytesDownload;
     qulonglong startPoint;
     qulonglong endPoint;
+    qulonglong index;
     QString range;
 };
 
@@ -42,21 +45,24 @@ public:
     explicit Downloader(QObject *parent = nullptr);
     void setNumberThreads(ushort numberThreads) { this->numberThreads = numberThreads; }
     quint16 getNumberThreads() { return this->numberThreads; }
-    qulonglong getFileSize(QUrl url);
-    void start(const QString &url);
+    static qulonglong getFileSize(QUrl url);
+    void start(const QString &url, const QString &dir);
 
 signals:
     void downloadComplete();
+    void downloadUpdate(int);
 
 private slots:
     void subPartComplete();
 
 private:
-    quint16 numberThreads = 32; //最大限制在65535
+    quint16 numberThreads = 8; //最大限制在65535
     qint16 numberComplet = 0;
     qulonglong fileSize;
+    qulonglong bytesDownload;
     QUrl url;
     QFile *file;
+    QDir dir;
     QString fileName;
 };
 

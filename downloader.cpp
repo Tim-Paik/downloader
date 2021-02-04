@@ -5,9 +5,11 @@
 #include <QEventLoop>
 #include <QFileInfo>
 #include <QUrl>
+#include <QDir>
 
-Download::Download(QObject *parent) : QObject(parent)
+Download::Download(qulonglong index, QObject *parent) : QObject(parent)
 {
+    this->index = index;
     this->bytesDownload = 0;
     this->startPoint = 0;
     this->endPoint = 0;
@@ -26,28 +28,24 @@ void Download::start(const QUrl &url, QFile *file,
 
     QNetworkRequest qheader;
     qheader.setUrl(url);
-    //this->range.sprintf("Bytes=%lld-%lld",startPoint,endPoint);
     this->range = QString("Bytes=%1-%2").arg(startPoint).arg(endPoint);
     qheader.setRawHeader("Range", this->range.toLatin1());  //range.toLatin1()转换range为ASCII的QByteArray
 
     QNetworkRequest request(qheader);
+    request.setHeader(QNetworkRequest::UserAgentHeader, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36 Edg/88.0.705.56");
     request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
     this->reply = this->manager.get(request);
 
-    //connect(this->reply,SIGNAL(finished()),this,SLOT(finishedPart()));
-    //connect(this->reply,SIGNAL(readyRead()),this,SLOT(readReady()));
     connect(this->reply,&QNetworkReply::finished,this,&Download::finishedPart);
     connect(this->reply,&QNetworkReply::readyRead,this,&Download::readReady);
 }
 
 void Download::finishedPart() {
     this->file->flush();
-    //this->reply->deleteLater();
-    //this->reply = 0;
-    //this->file = 0;
-    qDebug()<<"finishedPart";
+    this->reply->deleteLater();
+    this->reply = 0;
+    this->file = 0;
     emit this->downloadComplete();
-    qDebug()<<"downloadComplete emited";
 }
 
 void Download::readReady() {
@@ -58,13 +56,14 @@ void Download::readReady() {
     this->file->seek(this->startPoint + this->bytesDownload);
     this->file->write(buffer);
     this->bytesDownload += buffer.size();
+    emit this->downloadUpdate(buffer.size());
 }
 
 Downloader::Downloader(QObject *parent) : QObject(parent)
 {
     this->numberComplet = 0;
     this->fileSize = 0;
-    this->file = new QFile;
+    this->bytesDownload = 0;
 }
 
 qulonglong Downloader::getFileSize(QUrl url) {
@@ -72,19 +71,19 @@ qulonglong Downloader::getFileSize(QUrl url) {
     QEventLoop loop;
     //获取请求头
     QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::UserAgentHeader, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.96 Safari/537.36 Edg/88.0.705.56");
     request.setAttribute(QNetworkRequest::FollowRedirectsAttribute, true);
     QNetworkReply *reply = manager.head(request);
-    //connect(reply, SIGNAL(finished()), &loop, SLOT(quit()), Qt::DirectConnection);
     connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit, Qt::DirectConnection);
     loop.exec();
     //获取文件大小
     QVariant var = reply->header(QNetworkRequest::ContentLengthHeader);
     reply->deleteLater();
-    qDebug()<<var.toULongLong();
     return var.toULongLong();
 }
 
-void Downloader::start(const QString &url) {
+void Downloader::start(const QString &url, const QString &dir) {
+    this->dir = QDir(dir);
     this->url = QUrl(url);
     this->fileSize = getFileSize(this->url);
     QFileInfo fileInfo(this->url.path());
@@ -92,6 +91,8 @@ void Downloader::start(const QString &url) {
     if (this->fileName.isEmpty()) {
         this->fileName = "index.html";
     }
+    this->dir.makeAbsolute();
+    this->file = new QFile(this->dir.filePath(this->fileName));
     this->file->setFileName(fileName);
     this->file->open(QIODevice::WriteOnly);
     Download *temp;
@@ -99,22 +100,21 @@ void Downloader::start(const QString &url) {
     for (int i = 0; i < this->numberThreads; i++) {
         qulonglong start = fileSize * i / this->numberThreads;
         qulonglong end = fileSize * (i+1) / this->numberThreads;
-        temp = new Download();
-        //connect(temp,SIGNAL(downloadComplete()),this,SLOT(subPartComplete()));
-        //connect(temp,SIGNAL(downloadComplete()),temp,SLOT(deleteLater()));
+        temp = new Download(i+1);
         connect(temp,&Download::downloadComplete,this,&Downloader::subPartComplete);
         connect(temp,&Download::downloadComplete,temp,&Download::deleteLater);
+        connect(temp,&Download::downloadUpdate,[this](qulonglong bytes){
+            this->bytesDownload += bytes;
+            qDebug()<<"bytesDownload "<<this->bytesDownload;
+            emit downloadUpdate(this->bytesDownload * 100 / this->fileSize);
+        });
         temp->start(this->url,this->file,start,end);
-        qDebug()<<start<<end;
     }
 }
 
 void Downloader::subPartComplete() {
-    qDebug()<<"subPartComplete";
     this->numberComplet++;
-    qDebug()<<this->numberComplet;
     if (this->numberComplet == this->numberThreads) {
-        qDebug()<<"Complet";
         this->file->close();
         emit this->downloadComplete();
     }

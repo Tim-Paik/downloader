@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include "downloader.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -18,7 +19,12 @@ public:
 public slots:
     void ok();
 
+private slots:
+    void on_pushButton_clicked();
+
 private:
+    Downloader *downloader;
+    //Download *download;
     Ui::MainWindow *ui;
 };
 #endif // MAINWINDOW_H

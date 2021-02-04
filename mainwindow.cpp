@@ -1,21 +1,13 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "downloader.h"
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    Downloader down;
-    //connect(&down,SIGNAL(downloadComplete()),this,SLOT(ok()));
-    connect(&down,&Downloader::downloadComplete,this,&MainWindow::ok);
-    qDebug()<<"connect ok";
     qDebug()<<"QSslSocket="<<QSslSocket::sslLibraryBuildVersionString();
-    qDebug() << "OpenSSL支持情况:" << QSslSocket::supportsSsl();
-    QDateTime time = QDateTime::currentDateTime();
-    qDebug()<<time.toString("yyyy-MM-dd hh:mm:ss ddd");
-    down.start("https://mirrors.tuna.tsinghua.edu.cn/archlinuxcn/x86_64/archlinuxcn.files");
+    qDebug()<<"OpenSSL support: "<< QSslSocket::supportsSsl();
 }
 
 MainWindow::~MainWindow()
@@ -24,5 +16,19 @@ MainWindow::~MainWindow()
 }
 
 void MainWindow::ok() {
-    ui->label->setText("OK!");
+    ui->label->setText("Download Complete!");
+}
+
+void MainWindow::on_pushButton_clicked()
+{
+    downloader = new Downloader;
+    this->ui->progressBar->setRange(0,100);
+    this->ui->progressBar->reset();
+    connect(downloader,&Downloader::downloadComplete,this,&MainWindow::ok);
+    connect(downloader,&Downloader::downloadUpdate,[this](int progress) {
+        this->ui->progressBar->setValue(progress);
+        qDebug()<<progress;
+    });
+    ui->label->setText("Download Started!");
+    downloader->start(ui->lineEdit->text(),".");
 }
